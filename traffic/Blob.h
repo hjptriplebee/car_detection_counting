@@ -1,6 +1,6 @@
 // definition of blob class and some functions
-#ifndef BLOB
-#define BLOB
+#ifndef BLOB_H
+#define BLOB_H
 
 #include<iostream>
 #include<stdlib.h> 
@@ -28,10 +28,13 @@ const int minBlobDiagonal = 60;
 const int maxBlobDiagonal = 1000;
 const double minBlobRatio = 0.2;
 const double maxBlobRatio = 4;
-const double leftBounding = 0.25;
-const double rightBounding = 0.75;
-const double upBounding = 0.25;
-const double bottomBounding = 1;
+const double leftBoundingCoefficient = 0.2;
+const double rightBoundingCoefficient = 0.8;
+const double upBoundingCoefficient = 0.25;
+const double bottomBoundingCoefficient = 1;
+const double IOUThreshold = 0.7;
+const double resizeHeightCoefficient = 2;
+const double resizeWidthCoefficient = 2;
 
 class Blob 
 {
@@ -44,21 +47,18 @@ public:
 	bool isCurrentBlob;                          //is current blob£¿
 	int notMatchedFrameCnt;                      //how long it has't been matched
 	Point nextCenter;                            //next center
+	Scalar boxColor;                             //boundingbox color
 
 	Blob(vector<Point> c);                       //init
 	void predictNextCenter();                    //predict next center  
 };
 
-double getDistance(Point point1, Point point2);                                      //cal distance between two points
-void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs);            //match existing blob and current blob
-void updateBlob(Blob &currentBlob, vector<Blob> &existingBlobs, int &index);         //update existing blob
-void addBlob(Blob &currentBlob, vector<Blob> &existingBlobs);                        //add new blob
-void showContours(Size size, vector<vector<Point> > contours, string windowName);    //show contours in point vector
-void showContours(Size size, vector<Blob> blobs, string windowName);                 //show contours in blobs
-bool isCrossLine(vector<Blob> &blobs, int &countingLine, int &cnt);                  //judge if the blob has crossed the counting line
-void drawBlob(vector<Blob> &blobs, Mat &frame2Copy);                                 //draw bounding box
-void drawCnt(int &cnt, Mat &frame2Copy);                                             //draw counting result
+void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs, Mat &frame2Copy);                //match existing blob and current blob
+void showContours(Size size, vector<vector<Point> > contours, string windowName);                         //show contours in point vector
+void showContours(Size size, vector<Blob> blobs, string windowName);                                      //show contours in blobs
+bool isCrossLine(vector<Blob> &blobs, Point start, Point end, int &cnt);                                  //judge if the blob has crossed the counting line
+void drawBlob(vector<Blob> &blobs, Mat &frame2Copy);                                                      //draw bounding box
+void drawCnt(vector<int> &cnt, Mat &frame2Copy);                                                          //draw counting result
+bool isOverlapped(Rect box1, Rect box2);                                                                  //judge if bounding box is overlapped
 
 #endif 
-
-

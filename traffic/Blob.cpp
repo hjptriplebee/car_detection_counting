@@ -1,5 +1,9 @@
 // function of blob
 #include "Blob.h"
+#include "ComputationalGeometry.h"
+
+void updateBlob(Blob &currentBlob, vector<Blob> &existingBlobs, int &index);                              //update existing blob
+void addBlob(Blob &currentBlob, vector<Blob> &existingBlobs);                                             //add new blob
 
 Blob::Blob(vector<Point> c) 
 {
@@ -13,6 +17,7 @@ Blob::Blob(vector<Point> c)
 	ratio = 1.0 * boundingBox.width / boundingBox.height;
 	isCurrentBlob = true;
 	notMatchedFrameCnt = 0;
+	boxColor = Scalar(rand() % 255, rand() % 255, rand() & 255);
 }
 
 void Blob::predictNextCenter() 
@@ -21,9 +26,6 @@ void Blob::predictNextCenter()
 	int xShifting = 0, yShifting = 0;
 	int weightSum = (num - 1) * num / 2 > 0 ? (num - 1) * num / 2 : 1;
 	int limit = num > 4 ? 4 : num - 1;
-	cout << "num = " << num << endl;
-	cout << "weightSum = " << weightSum << endl;
-	cout << "limit = " << limit << endl;
 	for (int weight = 1; weight <= limit; weight += 1)
 	{
 		xShifting += weight * (center[num - limit + weight - 1].x - center[num - limit + weight - 2].x);
@@ -31,14 +33,10 @@ void Blob::predictNextCenter()
 	}
 	nextCenter.x = center.back().x + (int)round((float)xShifting / weightSum);
 	nextCenter.y = center.back().y + (int)round((float)yShifting / weightSum);
+	return;
 }
 
-double getDistance(Point p1, Point p2)
-{
-	return sqrt((double)(p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y));
-}
-
-void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs)
+void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs, Mat &frame2Copy)
 {
 	for (auto &existingBlob : existingBlobs)
 	{
@@ -61,7 +59,14 @@ void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs)
 		if (minDistance < currentBlob.diagonalLength * 0.5)  //old blob
 			updateBlob(currentBlob, existingBlobs, index);
 		else //new blob
+		{
+			if (currentBlob.center.back().x > frame2Copy.cols * leftBoundingCoefficient &&            //in detection area
+				currentBlob.center.back().x < frame2Copy.cols * rightBoundingCoefficient  &&
+				currentBlob.center.back().y > frame2Copy.rows * upBoundingCoefficient &&
+				currentBlob.center.back().y < frame2Copy.rows * bottomBoundingCoefficient
+			)
 			addBlob(currentBlob, existingBlobs);
+		}
 	}
 	for (auto itr = existingBlobs.begin(); itr != existingBlobs.end();)
 	{
@@ -71,6 +76,7 @@ void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs)
 		else
 			itr++;
 	}
+	return;
 }
 
 void updateBlob(Blob &currentBlob, vector<Blob> &existingBlobs, int &index)
@@ -81,12 +87,14 @@ void updateBlob(Blob &currentBlob, vector<Blob> &existingBlobs, int &index)
 	existingBlobs[index].diagonalLength = currentBlob.diagonalLength;
 	existingBlobs[index].ratio = currentBlob.ratio;
 	existingBlobs[index].isCurrentBlob = true;
+	return;
 }
 
 void addBlob(Blob &currentBlob, vector<Blob> &existingBlobs)
 {
 	currentBlob.isCurrentBlob = true;
 	existingBlobs.push_back(currentBlob);
+	return;
 }
 
 void showContours(Size size, vector<vector<Point> > contours, string windowName)
@@ -94,6 +102,7 @@ void showContours(Size size, vector<vector<Point> > contours, string windowName)
 	Mat image(size, CV_8UC3, BLACK);
 	drawContours(image, contours, -1, WHITE, -1);
 	imshow(windowName, image);
+	return;
 }
 
 void showContours(Size size, vector<Blob> blobs, string windowName)
@@ -103,17 +112,22 @@ void showContours(Size size, vector<Blob> blobs, string windowName)
 	for (auto &blob : blobs) contours.push_back(blob.contour);
 	drawContours(image, contours, -1, WHITE, -1);
 	imshow(windowName, image);
+	return;
 }
 
-bool isCrossLine(vector<Blob> &blobs, int &countingLine, int &cnt)
+bool isCrossLine(vector<Blob> &blobs, Point start, Point end, int &cnt)
 {
+	start.x = (int)(start.x / resizeWidthCoefficient);
+	start.y = (int)(start.y / resizeHeightCoefficient);
+	end.x = (int)(end.x / resizeWidthCoefficient);
+	end.y = (int)(end.y / resizeHeightCoefficient);
 	for (auto blob : blobs)
 	{
 		if (blob.center.size() >= 2)
 		{
-			int prevFrameIndex = (int)blob.center.size() - 2;
-			int currFrameIndex = (int)blob.center.size() - 1;
-			if (blob.center[prevFrameIndex].y > countingLine && blob.center[currFrameIndex].y <= countingLine)
+			Point preFrameCenter = blob.center[blob.center.size() - 2];
+			Point curFrameCenter = blob.center[blob.center.size() - 1];
+			if (isSegmentCross(start, end, preFrameCenter, curFrameCenter)) 
 			{
 				cnt++;
 				return true;
@@ -125,16 +139,46 @@ bool isCrossLine(vector<Blob> &blobs, int &countingLine, int &cnt)
 
 void drawBlob(vector<Blob> &blobs, Mat &frame2Copy)
 {
-	for (int i = 0; i < blobs.size(); i++) rectangle(frame2Copy, blobs[i].boundingBox, RED, lineThickness);
+	for (auto blob : blobs)
+	{
+		Rect r = blob.boundingBox;
+		r.x = (int)(r.x * resizeWidthCoefficient);
+		r.width = (int)(r.width * resizeWidthCoefficient);
+		r.y = (int)(r.y * resizeHeightCoefficient);
+		r.height = (int)(r.height * resizeHeightCoefficient);
+		rectangle(frame2Copy, r, blob.boxColor, lineThickness);
+	}
+	return;
 }
 
-void drawCnt(int &cnt, Mat &frame2Copy)
+void drawCnt(vector<int> &cnt, Mat &frame2Copy)
 {
-	double fontScale = (frame2Copy.rows * frame2Copy.cols) / 300000.0;
+	double fontScale = (frame2Copy.rows * frame2Copy.cols) / 800000.0;
 	int fontThickness = (int)round(fontScale * 1.5);
-	Size textSize = getTextSize(to_string(cnt), CV_FONT_HERSHEY_SIMPLEX, fontScale, fontThickness, 0);
-	Point bottomLeftPosition;
-	bottomLeftPosition.x = frame2Copy.cols - 1 - (int)((double)textSize.width * 1.25);
-	bottomLeftPosition.y = (int)((double)textSize.height * 1.25);
-	putText(frame2Copy, to_string(cnt), bottomLeftPosition, CV_FONT_HERSHEY_SIMPLEX, fontScale, GREEN, fontThickness);
+	for (int i = 0; i < cnt.size(); i++)
+	{
+		string text("line " + to_string(i + 1) + ": " + to_string(cnt[i]));
+		Size textSize = getTextSize(text, CV_FONT_HERSHEY_SIMPLEX, fontScale, fontThickness, 0);
+		Point position;
+		position.x = frame2Copy.cols - 1 - (int)((double)textSize.width * 1.1);
+		position.y = (int)((double)textSize.height * 1.25 * (i + 1));
+		putText(frame2Copy, text, position, CV_FONT_HERSHEY_SIMPLEX, fontScale, GREEN, fontThickness);
+	}
+	return;
+}
+
+bool isOverlapped(Rect box1, Rect box2)
+{
+	Point tl1 = box1.tl(), br1 = box1.br();
+	Point tl2 = box2.tl(), br2 = box2.br();
+	if (tl1.x > br2.x) return false; //disjoint from each other
+	if (tl1.y > br2.y) return false;
+	if (tl2.x > br1.x) return false;
+	if (tl2.y > br1.y) return false;
+	int colInt = min(br1.x, br2.x) - max(tl1.x, tl2.x);
+	int rowInt = min(br1.y, br2.y) - max(tl1.y, tl2.y);
+	int intersection = colInt * rowInt;
+	if ((float)intersection / box1.area() > IOUThreshold) return true;
+
+	return false;
 }
