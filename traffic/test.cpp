@@ -1,7 +1,8 @@
 // main.cpp
 #include "Blob.h"
-#define SHOW_FLAG false
+#define SHOW_FLAG true
 #define DEBUG_BY_STEP false
+
 void carCounting(vector<pair<double, double>> &crossingLineStart, vector<pair<double, double>> &crossingLineEnd)
 {
 	/*== == == == == == == == == == = step1 Variable definition and Initialization == == == == == == == == == == == == == == =*/
@@ -12,10 +13,9 @@ void carCounting(vector<pair<double, double>> &crossingLineStart, vector<pair<do
 	vector<int> cnt(crossingLineStart.size(), 0);                       //number of cars cross each line
 	int frameCnt = 2;                                                   //number of frames	
 	char keyValue = 0;                                                  //key you press
-	bool firstFlag = true;                                              //is first frame?
 
 	//capture.open("E:\\traffic\\交通路口流量统计\\交通路口流量统计\\华池街.wmv");
-	//capture.open("E:\\traffic\\OpenCV_3_Car_Counting_Cpp-master\\CarsDrivingUnderBridge.mp4");
+	//capture.open("E:\\traffic\\OpenCV_3_Car_Counting_Cpp-master\\CarsDrivingUnderBridge.mp4");	
 	capture.open("E:\\traffic\\交通路口流量统计\\交通视频-金科\\[0001070]-[2017-02-13_18_40_13]-[2017-02-13_19_10_13].mkv");
 	if (!capture.isOpened()) //cannot open the video
 	{                                                
@@ -25,6 +25,8 @@ void carCounting(vector<pair<double, double>> &crossingLineStart, vector<pair<do
 	}
 	capture.read(frame1);
 	capture.read(frame2);
+
+	//VideoWriter writer("E:\\traffic\\OpenCV_3_Car_Counting_Cpp-master\\CarsDrivingUnderBridge1.avi", CV_FOURCC('D', 'I', 'V', 'X'), 29, Size(frame2.cols, frame2.rows), true);
 
 	for (int i = 0; i < crossingLineStart.size(); i++)       //scale to coordinate
 	{
@@ -84,10 +86,9 @@ void carCounting(vector<pair<double, double>> &crossingLineStart, vector<pair<do
 		for (int i = 0; i < contours.size(); i++) convexHull(contours[i], convexHulls[i]);
 
 		if (SHOW_FLAG) showContours(imgThresh.size(), convexHulls, "imgConvexHulls");
-
 		for (auto &convexHull : convexHulls) //filter with heuristic knowledge 
 		{
-			Blob possibleBlob(convexHull);
+			Blob possibleBlob(convexHull, (int)lineStart.size());
 			if (
 				possibleBlob.boundingBox.area() > minBlobArea &&
 				possibleBlob.boundingBox.area() < maxBlobArea &&
@@ -103,7 +104,6 @@ void carCounting(vector<pair<double, double>> &crossingLineStart, vector<pair<do
 			)
 				tempBlobs.push_back(possibleBlob);	
 		}
-
 		for (int i = 0, j ; i < tempBlobs.size(); i++) //filter with inclusion
 		{
 			for (j = 0; j < tempBlobs.size(); j++) 
@@ -113,25 +113,21 @@ void carCounting(vector<pair<double, double>> &crossingLineStart, vector<pair<do
 		}
 		if (SHOW_FLAG) showContours(imgThresh.size(), currentBlobs, "imgcurrentBlobs");
 
-		if (firstFlag == true) //is first frame
-			for (auto &currentBlob : currentBlobs) blobs.push_back(currentBlob);
-		else 
-			matchBlobs(blobs, currentBlobs, frame2Copy);
+		matchBlobs(blobs, currentBlobs, frame2Copy);
 		if (SHOW_FLAG) showContours(imgThresh.size(), blobs, "imgBlobs");
 
 		/*== == == == == == == == == == = step2.3 counting and draw blobs == == == == == == == == == == == == == == =*/
 		frame2Copy = frame2.clone();
 		drawBlob(blobs, frame2Copy);
-		
 		for (int i = 0; i < lineStart.size(); i++)
 		{
-			if (isCrossLine(blobs, lineStart[i], lineEnd[i], cnt[i])) //some blob has crossed the line
+			if (isCrossLine(blobs, lineStart[i], lineEnd[i], cnt[i], i)) //some blob has crossed the line
 				line(frame2Copy, lineStart[i], lineEnd[i], GREEN, lineThickness);
 			else
 				line(frame2Copy, lineStart[i], lineEnd[i], RED, lineThickness);
 		}
 		drawCnt(cnt, frame2Copy);
-
+		//writer << frame2Copy;
 		imshow("frame2Copy", frame2Copy);
 
 		/*== == == == == == == == == == = step2.4 prepare for the next iteration == == == == == == == == == == == == == == =*/
@@ -141,13 +137,14 @@ void carCounting(vector<pair<double, double>> &crossingLineStart, vector<pair<do
 			capture.read(frame2);
 		else 
 			break;
-		firstFlag = false;
+
 		frameCnt++;
 		keyValue = waitKey(1);
 		if (DEBUG_BY_STEP) waitKey(0);
 	}
 	cout << "按任意键退出！" << endl;
 	if (keyValue != 27) waitKey(0);                         //don't press ESC
+	//writer.release();
 	return;
 }
 
@@ -155,12 +152,12 @@ int main()
 {
 	vector<pair<double, double>> crossingLineStart;                      //represent counting line
 	vector<pair<double, double>> crossingLineEnd;
-	pair<double, double> straightStart(0.25, 0.5);
-	pair<double, double> straightEnd(0.75, 0.5);
-	pair<double, double> leftStart(0.25, 0);
-	pair<double, double> leftEnd(0.25, 0.5);
+	pair<double, double> straightStart(0.15, 0.45);
+	pair<double, double> straightEnd(0.9, 0.45);
+	pair<double, double> leftStart(0.15, 0);
+	pair<double, double> leftEnd(0.15, 0.45);
 	pair<double, double> rightStart(0.75, 0);
-	pair<double, double> rightEnd(0.75, 0.5);
+	pair<double, double> rightEnd(0.75, 0.45);
 
 	crossingLineStart.push_back(straightStart);
 	crossingLineStart.push_back(leftStart);

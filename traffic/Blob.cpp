@@ -5,7 +5,7 @@
 void updateBlob(Blob &currentBlob, vector<Blob> &existingBlobs, int &index);                              //update existing blob
 void addBlob(Blob &currentBlob, vector<Blob> &existingBlobs);                                             //add new blob
 
-Blob::Blob(vector<Point> c) 
+Blob::Blob(vector<Point> c, int countingLineNum)
 {
 	contour = c;
 	boundingBox = boundingRect(contour);
@@ -18,6 +18,8 @@ Blob::Blob(vector<Point> c)
 	isCurrentBlob = true;
 	notMatchedFrameCnt = 0;
 	boxColor = Scalar(rand() % 255, rand() % 255, rand() & 255);
+	vector<bool> temp(countingLineNum, false);
+	isCounted = temp;
 }
 
 void Blob::predictNextCenter() 
@@ -46,7 +48,7 @@ void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs, Mat &fr
 	for (auto &currentBlob : currentBlobs)
 	{
 		int index = 0;
-		double minDistance = 100000.0;	
+		double minDistance = 1000000.0;	
 		for (int i = 0; i < existingBlobs.size(); i++)  //get the closest blob
 		{
 			double dblDistance = getDistance(currentBlob.center.back(), existingBlobs[i].nextCenter);
@@ -56,7 +58,7 @@ void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs, Mat &fr
 				index = i;
 			}
 		}
-		if (minDistance < currentBlob.diagonalLength * 0.5)  //old blob
+		if (minDistance < currentBlob.diagonalLength * 0.4)  //old blob
 			updateBlob(currentBlob, existingBlobs, index);
 		else //new blob
 		{
@@ -70,7 +72,10 @@ void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs, Mat &fr
 	}
 	for (auto itr = existingBlobs.begin(); itr != existingBlobs.end();)
 	{
-		if (itr->isCurrentBlob == false) itr->notMatchedFrameCnt++; 
+		if (itr->isCurrentBlob == false) 
+			itr->notMatchedFrameCnt++; 
+		else
+			itr->notMatchedFrameCnt = 0;
 		if (itr->notMatchedFrameCnt >= 5) //erase disappeared blob
 			itr = existingBlobs.erase(itr);
 		else
@@ -115,32 +120,35 @@ void showContours(Size size, vector<Blob> blobs, string windowName)
 	return;
 }
 
-bool isCrossLine(vector<Blob> &blobs, Point start, Point end, int &cnt)
+bool isCrossLine(vector<Blob> &blobs, Point start, Point end, int &cnt, int &index)
 {
 	start.x = (int)(start.x / resizeWidthCoefficient);
 	start.y = (int)(start.y / resizeHeightCoefficient);
 	end.x = (int)(end.x / resizeWidthCoefficient);
 	end.y = (int)(end.y / resizeHeightCoefficient);
-	for (auto blob : blobs)
+	bool flag = false;
+	for (auto &blob : blobs)
 	{
-		if (blob.center.size() >= 2)
+		if (blob.center.size() >= 2 && !blob.isCounted[index] && blob.isCurrentBlob)
 		{
 			Point preFrameCenter = blob.center[blob.center.size() - 2];
 			Point curFrameCenter = blob.center[blob.center.size() - 1];
 			if (isSegmentCross(start, end, preFrameCenter, curFrameCenter)) 
 			{
 				cnt++;
-				return true;
+				blob.isCounted[index] = true;
+				flag = true;
 			}
 		}
 	}
-	return false;
+	return flag;
 }
 
 void drawBlob(vector<Blob> &blobs, Mat &frame2Copy)
 {
 	for (auto blob : blobs)
 	{
+		if (!blob.isCurrentBlob) continue;
 		Rect r = blob.boundingBox;
 		r.x = (int)(r.x * resizeWidthCoefficient);
 		r.width = (int)(r.width * resizeWidthCoefficient);
@@ -181,4 +189,74 @@ bool isOverlapped(Rect box1, Rect box2)
 	if ((float)intersection / box1.area() > IOUThreshold) return true;
 
 	return false;
+}
+
+int mergeContour(const vector<std::vector<cv::Point>> srcContour, vector<std::vector<cv::Point>> &dstContour, double gap, int size) 
+{
+	vector<std::vector<cv::Point>> tempDst;
+	int needAgain(0);
+	int srcSize = srcContour.size();
+	if (srcSize == 0) 
+	{
+		return -1;
+	}
+	tempDst.push_back(srcContour[0]);
+
+	for (int srcIndex = 1; srcIndex < srcSize; srcIndex++) 
+	{
+		int isMerge(0);
+		if (contourArea(srcContour[srcIndex]) < size)
+			continue;
+		for (int dstIndex = 0; ((dstIndex < tempDst.size()) && (isMerge != 1)); dstIndex++) 
+		{
+			for (int srcPoint = 0; ((srcPoint < srcContour[srcIndex].size()) && (isMerge != 1)); srcPoint++) 
+			{				
+				for (int dstPoint = 0; ((dstPoint < tempDst[dstIndex].size()) && (isMerge != 1)); dstPoint++) 
+				{
+					if (pointPolygonTest(tempDst[dstIndex], srcContour[srcIndex][srcPoint], false) != -1) 
+					{
+						//   cout << pointPolygonTest(dstContour[dstIndex], srcContour[srcIndex][srcPoint], false) << endl;
+						isMerge = 1;
+						break;
+					}
+					double srcX = srcContour[srcIndex][srcPoint].x;
+					double srcY = srcContour[srcIndex][srcPoint].y;
+					double dstX = tempDst[dstIndex][dstPoint].x;
+					double dstY = tempDst[dstIndex][dstPoint].y;
+					if (sqrt(pow(abs(dstX - srcX), 2) + pow(abs(dstY - srcY), 2)) < gap)
+					{
+						isMerge = 1;
+						break;
+					}
+				} //dstPoint
+			}  //srcPoint
+
+			if (isMerge == 1) 
+			{
+				for (int srcPointCount = 0; srcPointCount < srcContour[srcIndex].size(); srcPointCount++) 
+				{
+					tempDst[dstIndex].push_back(srcContour[srcIndex][srcPointCount]);
+				}
+				std::vector<cv::Point>temp;
+				convexHull(tempDst[dstIndex], temp);
+				tempDst[dstIndex].clear();
+				tempDst[dstIndex].assign(temp.begin(), temp.end());
+				needAgain = 1;
+				break;
+			}
+		}  //dst index
+		if (isMerge == 0) 
+		{
+			tempDst.push_back(srcContour[srcIndex]);
+		}
+	} //src index
+	if (needAgain) 
+	{
+		mergeContour(tempDst, dstContour, gap, size);
+	}
+	else 
+	{
+		dstContour = tempDst;
+	}
+	return 1;
 }
