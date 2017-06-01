@@ -1,6 +1,6 @@
 // main.cpp
 #include "Blob.h"
-#define SHOW_FLAG true
+#define SHOW_FLAG false
 #define DEBUG_BY_STEP false
 
 void carCounting(vector<pair<double, double>> &crossingLineStart, vector<pair<double, double>> &crossingLineEnd)
@@ -15,8 +15,8 @@ void carCounting(vector<pair<double, double>> &crossingLineStart, vector<pair<do
 	char keyValue = 0;                                                  //key you press
 
 	//capture.open("E:\\traffic\\交通路口流量统计\\交通路口流量统计\\华池街.wmv");
-	//capture.open("E:\\traffic\\OpenCV_3_Car_Counting_Cpp-master\\CarsDrivingUnderBridge.mp4");	
-	capture.open("E:\\traffic\\交通路口流量统计\\交通视频-金科\\[0001070]-[2017-02-13_18_40_13]-[2017-02-13_19_10_13].mkv");
+	capture.open("E:\\traffic\\OpenCV_3_Car_Counting_Cpp-master\\CarsDrivingUnderBridge.mp4");	
+	//capture.open("E:\\traffic\\交通路口流量统计\\交通视频-金科\\[0001070]-[2017-02-13_18_40_13]-[2017-02-13_19_10_13].mkv");
 	if (!capture.isOpened()) //cannot open the video
 	{                                                
 		cout << "can't open the video！" << endl;      
@@ -89,25 +89,26 @@ void carCounting(vector<pair<double, double>> &crossingLineStart, vector<pair<do
 		for (auto &convexHull : convexHulls) //filter with heuristic knowledge 
 		{
 			Blob possibleBlob(convexHull, (int)lineStart.size());
+			Rect possibleBoundingBox = possibleBlob.getBoundingBox();
 			if (
-				possibleBlob.boundingBox.area() > minBlobArea &&
-				possibleBlob.boundingBox.area() < maxBlobArea &&
-				possibleBlob.ratio > minBlobRatio &&
-				possibleBlob.ratio < maxBlobRatio &&
-				possibleBlob.boundingBox.width > minBlobWidth &&
-				possibleBlob.boundingBox.width < maxBlobWidth &&
-				possibleBlob.boundingBox.height > minBlobheight &&
-				possibleBlob.boundingBox.height < maxBlobheight &&
-				possibleBlob.diagonalLength > minBlobDiagonal &&
-				possibleBlob.diagonalLength < maxBlobDiagonal &&
-				(contourArea(possibleBlob.contour) / (double)possibleBlob.boundingBox.area()) > 0.50        //contour area / rect area 
+				possibleBoundingBox.area() > minBlobArea &&
+				possibleBoundingBox.area() < maxBlobArea &&
+				possibleBlob.getRatio() > minBlobRatio &&
+				possibleBlob.getRatio() < maxBlobRatio &&
+				possibleBoundingBox.width > minBlobWidth &&
+				possibleBoundingBox.width < maxBlobWidth &&
+				possibleBoundingBox.height > minBlobheight &&
+				possibleBoundingBox.height < maxBlobheight &&
+				possibleBlob.getDiagonalLength() > minBlobDiagonal &&
+				possibleBlob.getDiagonalLength() < maxBlobDiagonal &&
+				(contourArea(possibleBlob.getContour()) / (double)possibleBoundingBox.area()) > 0.50        //contour area / rect area 
 			)
 				tempBlobs.push_back(possibleBlob);	
 		}
 		for (int i = 0, j ; i < tempBlobs.size(); i++) //filter with inclusion
 		{
 			for (j = 0; j < tempBlobs.size(); j++) 
-				if(j != i && isOverlapped(tempBlobs[i].boundingBox, tempBlobs[j].boundingBox)) break; //is covered
+			if (j != i && isOverlapped(tempBlobs[i].getBoundingBox(), tempBlobs[j].getBoundingBox())) break; //is covered
 			if (j == tempBlobs.size())
 				currentBlobs.push_back(tempBlobs[i]);			
 		}

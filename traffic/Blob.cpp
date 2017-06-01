@@ -2,7 +2,6 @@
 #include "Blob.h"
 #include "ComputationalGeometry.h"
 
-void updateBlob(Blob &currentBlob, vector<Blob> &existingBlobs, int &index);                              //update existing blob
 void addBlob(Blob &currentBlob, vector<Blob> &existingBlobs);                                             //add new blob
 
 Blob::Blob(vector<Point> c, int countingLineNum)
@@ -22,6 +21,79 @@ Blob::Blob(vector<Point> c, int countingLineNum)
 	isCounted = temp;
 }
 
+/*== == == == == == == == == == = get function of blob == == == == == == == == == == == == == == =*/
+
+Rect Blob::getBoundingBox()
+{
+	return boundingBox;
+}
+
+vector<Point> Blob::getCenter()
+{
+	return center;
+}
+
+vector<Point> Blob::getContour()
+{
+	return contour;
+}
+
+double Blob::getDiagonalLength()
+{
+	return diagonalLength;
+}
+
+double Blob::getRatio()
+{
+	return ratio;
+}
+
+bool Blob::getIsCurrentBlob()
+{
+	return isCurrentBlob;
+}
+
+vector<bool> Blob::getIsCounted()
+{
+	return isCounted;
+}
+
+Point Blob::getNextCenter()
+{
+	return nextCenter;
+}
+
+Scalar Blob::getBoxColor()
+{
+	return boxColor;
+}
+
+int Blob::getNotMatchedFrameCnt()
+{
+	return notMatchedFrameCnt;
+}
+
+/*== == == == == == == == == == = change function of blob == == == == == == == == == == == == == == =*/
+void Blob::changeIsCountedToTrue(int index)
+{
+	isCounted[index] = true;
+}
+
+void Blob::changeIsCurrentBlobToFalse()
+{
+	isCurrentBlob = false;
+}
+
+void Blob::addNotMatchedFrameCnt()
+{
+	notMatchedFrameCnt++;
+}
+
+void Blob::zeroNotMatchedFrameCnt()
+{
+	notMatchedFrameCnt = 0;
+}
+
 void Blob::predictNextCenter() 
 {
 	int num = (int)center.size();
@@ -38,11 +110,23 @@ void Blob::predictNextCenter()
 	return;
 }
 
+void Blob::updateBlob(Blob &currentBlob)
+{
+	contour = currentBlob.contour;
+	boundingBox = currentBlob.boundingBox;
+	center.push_back(currentBlob.center.back());
+	diagonalLength = currentBlob.diagonalLength;
+	ratio = currentBlob.ratio;
+	isCurrentBlob = true;
+	return;
+}
+
+/*== == == == == == == == == == = outer function == == == == == == == == == == == == == == =*/
 void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs, Mat &frame2Copy)
 {
 	for (auto &existingBlob : existingBlobs)
 	{
-		existingBlob.isCurrentBlob = false;
+		existingBlob.changeIsCurrentBlobToFalse();
 		existingBlob.predictNextCenter();
 	}
 	for (auto &currentBlob : currentBlobs)
@@ -51,32 +135,33 @@ void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs, Mat &fr
 		double minDistance = 1000000.0;	
 		for (int i = 0; i < existingBlobs.size(); i++)  //get the closest blob
 		{
-			double dblDistance = getDistance(currentBlob.center.back(), existingBlobs[i].nextCenter);
+			double dblDistance = getDistance(currentBlob.getCenter().back(), existingBlobs[i].getNextCenter());
 			if (dblDistance < minDistance)
 			{
 				minDistance = dblDistance;
 				index = i;
 			}
 		}
-		if (minDistance < currentBlob.diagonalLength * 0.4)  //old blob
-			updateBlob(currentBlob, existingBlobs, index);
+		if (minDistance < currentBlob.getDiagonalLength() * 0.4)  //old blob
+			existingBlobs[index].updateBlob(currentBlob);
 		else //new blob
 		{
-			if (currentBlob.center.back().x > frame2Copy.cols * leftBoundingCoefficient &&            //in detection area
-				currentBlob.center.back().x < frame2Copy.cols * rightBoundingCoefficient  &&
-				currentBlob.center.back().y > frame2Copy.rows * upBoundingCoefficient &&
-				currentBlob.center.back().y < frame2Copy.rows * bottomBoundingCoefficient
+			vector<Point> currentBlobCenter = currentBlob.getCenter();
+			if (currentBlobCenter.back().x > frame2Copy.cols * leftBoundingCoefficient &&            //in detection area
+				currentBlobCenter.back().x < frame2Copy.cols * rightBoundingCoefficient  &&
+				currentBlobCenter.back().y > frame2Copy.rows * upBoundingCoefficient &&
+				currentBlobCenter.back().y < frame2Copy.rows * bottomBoundingCoefficient
 			)
 			addBlob(currentBlob, existingBlobs);
 		}
 	}
 	for (auto itr = existingBlobs.begin(); itr != existingBlobs.end();)
 	{
-		if (itr->isCurrentBlob == false) 
-			itr->notMatchedFrameCnt++; 
+		if (itr->getIsCurrentBlob() == false) 
+			itr->addNotMatchedFrameCnt(); 
 		else
-			itr->notMatchedFrameCnt = 0;
-		if (itr->notMatchedFrameCnt >= 5) //erase disappeared blob
+			itr->zeroNotMatchedFrameCnt();
+		if (itr->getNotMatchedFrameCnt() >= 5) //erase disappeared blob
 			itr = existingBlobs.erase(itr);
 		else
 			itr++;
@@ -84,20 +169,9 @@ void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs, Mat &fr
 	return;
 }
 
-void updateBlob(Blob &currentBlob, vector<Blob> &existingBlobs, int &index)
-{
-	existingBlobs[index].contour = currentBlob.contour;
-	existingBlobs[index].boundingBox = currentBlob.boundingBox;
-	existingBlobs[index].center.push_back(currentBlob.center.back());
-	existingBlobs[index].diagonalLength = currentBlob.diagonalLength;
-	existingBlobs[index].ratio = currentBlob.ratio;
-	existingBlobs[index].isCurrentBlob = true;
-	return;
-}
-
 void addBlob(Blob &currentBlob, vector<Blob> &existingBlobs)
 {
-	currentBlob.isCurrentBlob = true;
+	currentBlob.changeIsCurrentBlobToFalse();
 	existingBlobs.push_back(currentBlob);
 	return;
 }
@@ -114,7 +188,7 @@ void showContours(Size size, vector<Blob> blobs, string windowName)
 {
 	Mat image(size, CV_8UC3, BLACK);
 	vector<vector<Point> > contours;
-	for (auto &blob : blobs) contours.push_back(blob.contour);
+	for (auto &blob : blobs) contours.push_back(blob.getContour());
 	drawContours(image, contours, -1, WHITE, -1);
 	imshow(windowName, image);
 	return;
@@ -129,14 +203,16 @@ bool isCrossLine(vector<Blob> &blobs, Point start, Point end, int &cnt, int &ind
 	bool flag = false;
 	for (auto &blob : blobs)
 	{
-		if (blob.center.size() >= 2 && !blob.isCounted[index] && blob.isCurrentBlob)
+		vector<bool> blobIsCounted = blob.getIsCounted();
+		if (blob.getCenter().size() >= 2 && !blobIsCounted[index] && blob.getIsCurrentBlob())
 		{
-			Point preFrameCenter = blob.center[blob.center.size() - 2];
-			Point curFrameCenter = blob.center[blob.center.size() - 1];
+			vector<Point> blobCenter = blob.getCenter();
+			Point preFrameCenter = blobCenter[blobCenter.size() - 2];
+			Point curFrameCenter = blobCenter[blobCenter.size() - 1];
 			if (isSegmentCross(start, end, preFrameCenter, curFrameCenter)) 
 			{
 				cnt++;
-				blob.isCounted[index] = true;
+				blob.changeIsCountedToTrue(index);
 				flag = true;
 			}
 		}
@@ -148,13 +224,13 @@ void drawBlob(vector<Blob> &blobs, Mat &frame2Copy)
 {
 	for (auto blob : blobs)
 	{
-		if (!blob.isCurrentBlob) continue;
-		Rect r = blob.boundingBox;
+		if (!blob.getIsCurrentBlob()) continue;
+		Rect r = blob.getBoundingBox();
 		r.x = (int)(r.x * resizeWidthCoefficient);
 		r.width = (int)(r.width * resizeWidthCoefficient);
 		r.y = (int)(r.y * resizeHeightCoefficient);
 		r.height = (int)(r.height * resizeHeightCoefficient);
-		rectangle(frame2Copy, r, blob.boxColor, lineThickness);
+		rectangle(frame2Copy, r, blob.getBoxColor(), lineThickness);
 	}
 	return;
 }
@@ -215,7 +291,6 @@ int mergeContour(const vector<std::vector<cv::Point>> srcContour, vector<std::ve
 				{
 					if (pointPolygonTest(tempDst[dstIndex], srcContour[srcIndex][srcPoint], false) != -1) 
 					{
-						//   cout << pointPolygonTest(dstContour[dstIndex], srcContour[srcIndex][srcPoint], false) << endl;
 						isMerge = 1;
 						break;
 					}

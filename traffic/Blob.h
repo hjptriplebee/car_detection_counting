@@ -38,20 +38,37 @@ const double resizeWidthCoefficient = 2;
 
 class Blob 
 {
-public:
+private:
 	vector<Point> contour;                       //contour
-	Rect boundingBox;                            //bounding box
+	Rect boundingBox;                            //bounding box	
 	vector<Point> center;                        //center point
 	double diagonalLength;                       //diagonal length
 	double ratio;                                //width / height
 	bool isCurrentBlob;                          //is current blob£¿
 	vector<bool> isCounted;                      //is counted by lines?
-	int notMatchedFrameCnt;                      //how long it has't been matched
 	Point nextCenter;                            //next center
 	Scalar boxColor;                             //boundingbox color
+	int notMatchedFrameCnt;                      //how long it has't been matched	
 
+public:		
 	Blob(vector<Point> c, int countingLineNum);  //init
+	vector<Point> getCenter();                   //get center
+	vector<Point> getContour();                  //get contour
+	vector<bool> getIsCounted();                 //get is counted
+	double getDiagonalLength();                  //get diagonal length
+	double getRatio();                           //get ratio
+	bool getIsCurrentBlob();                     //get is current blob
+	int getNotMatchedFrameCnt();                 //get not matched frame cnt
+	Rect getBoundingBox();                       //get boundingbox
+	Point getNextCenter();                       //get next center
+	Scalar getBoxColor();                        //get box color
+
+	void changeIsCountedToTrue(int index);       //is counted to true
+	void changeIsCurrentBlobToFalse();           //is current blob to false
+	void addNotMatchedFrameCnt();                //add not matched frame cnt
+	void zeroNotMatchedFrameCnt();               //set not matched frame cnt to zero
 	void predictNextCenter();                    //predict next center  
+	void updateBlob(Blob &currentBlob);          //update blob by current blob
 };
 
 void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs, Mat &frame2Copy);                //match existing blob and current blob
