@@ -19,6 +19,7 @@ Blob::Blob(vector<Point> c, int countingLineNum)
 	boxColor = Scalar(rand() % 255, rand() % 255, rand() & 255);
 	vector<bool> temp(countingLineNum, false);
 	isCounted = temp;
+	numOfCrossedCountingLine = 0;
 }
 
 /*== == == == == == == == == == = get function of blob == == == == == == == == == == == == == == =*/
@@ -73,7 +74,17 @@ int Blob::getNotMatchedFrameCnt()
 	return notMatchedFrameCnt;
 }
 
+int Blob::getNumOfCrossedCountingLine()
+{
+	return numOfCrossedCountingLine;
+}
+
 /*== == == == == == == == == == = change function of blob == == == == == == == == == == == == == == =*/
+void Blob::addNumOfCrossedCountingLine(int add)
+{
+	numOfCrossedCountingLine += add;
+}
+
 void Blob::changeIsCountedToTrue(int index)
 {
 	isCounted[index] = true;
@@ -132,9 +143,10 @@ void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs, Mat &fr
 	for (auto &currentBlob : currentBlobs)
 	{
 		int index = 0;
-		double minDistance = 1000000.0;	
+		double minDistance = 100000.0;	
 		for (int i = 0; i < existingBlobs.size(); i++)  //get the closest blob
 		{
+			if (existingBlobs[i].getNotMatchedFrameCnt() > 5) continue;
 			double dblDistance = getDistance(currentBlob.getCenter().back(), existingBlobs[i].getNextCenter());
 			if (dblDistance < minDistance)
 			{
@@ -142,17 +154,33 @@ void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs, Mat &fr
 				index = i;
 			}
 		}
-		if (minDistance < currentBlob.getDiagonalLength() * 0.4)  //old blob
+		if (minDistance < currentBlob.getDiagonalLength() * 0.6)  //old blob
 			existingBlobs[index].updateBlob(currentBlob);
-		else //new blob
+		else //prevent current blob from matching very old blob unless it has no choice
 		{
-			vector<Point> currentBlobCenter = currentBlob.getCenter();
-			if (currentBlobCenter.back().x > frame2Copy.cols * leftBoundingCoefficient &&            //in detection area
-				currentBlobCenter.back().x < frame2Copy.cols * rightBoundingCoefficient  &&
-				currentBlobCenter.back().y > frame2Copy.rows * upBoundingCoefficient &&
-				currentBlobCenter.back().y < frame2Copy.rows * bottomBoundingCoefficient
-			)
-			addBlob(currentBlob, existingBlobs);
+			double minDistance = 100000.0;
+			for (int i = 0; i < existingBlobs.size(); i++)  //get the closest blob
+			{
+				if (existingBlobs[i].getNotMatchedFrameCnt() <= 5) continue;
+				double dblDistance = getDistance(currentBlob.getCenter().back(), existingBlobs[i].getNextCenter());
+				if (dblDistance < minDistance)
+				{
+					minDistance = dblDistance;
+					index = i;
+				}
+			}
+			if (minDistance < currentBlob.getDiagonalLength() * 0.6)  //very old blob
+				existingBlobs[index].updateBlob(currentBlob);
+			else //new blob
+			{
+				vector<Point> currentBlobCenter = currentBlob.getCenter();
+				if (currentBlobCenter.back().x > frame2Copy.cols * leftBoundingCoefficient &&            //in detection area
+					currentBlobCenter.back().x < frame2Copy.cols * rightBoundingCoefficient  &&
+					currentBlobCenter.back().y > frame2Copy.rows * upBoundingCoefficient &&
+					currentBlobCenter.back().y < frame2Copy.rows * bottomBoundingCoefficient
+					)
+					addBlob(currentBlob, existingBlobs);
+			}
 		}
 	}
 	for (auto itr = existingBlobs.begin(); itr != existingBlobs.end();)
@@ -162,7 +190,18 @@ void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs, Mat &fr
 		else
 			itr->zeroNotMatchedFrameCnt();
 		if (itr->getNotMatchedFrameCnt() >= 5) //erase disappeared blob
-			itr = existingBlobs.erase(itr);
+		{
+			if (itr->getNumOfCrossedCountingLine() != 1) //not in
+				itr = existingBlobs.erase(itr);
+			else
+			{
+				vector<bool> blobIsCounted = itr->getIsCounted(); //only counted by out line
+				if (blobIsCounted[0] || blobIsCounted[2] || blobIsCounted[4] || blobIsCounted[6])
+					itr = existingBlobs.erase(itr);
+				else
+					itr++;
+			}
+		}
 		else
 			itr++;
 	}
@@ -194,7 +233,7 @@ void showContours(Size size, vector<Blob> blobs, string windowName)
 	return;
 }
 
-bool isCrossLine(vector<Blob> &blobs, Point start, Point end, int &cnt, int &index)
+bool isCrossLine(vector<Blob> &blobs, Point start, Point end, int &cnt, int &index, vector<vector<int>> &total)
 {
 	start.x = (int)(start.x / resizeWidthCoefficient);
 	start.y = (int)(start.y / resizeHeightCoefficient);
@@ -213,6 +252,17 @@ bool isCrossLine(vector<Blob> &blobs, Point start, Point end, int &cnt, int &ind
 			{
 				cnt++;
 				blob.changeIsCountedToTrue(index);
+				blob.addNumOfCrossedCountingLine(1);
+				if (blob.getNumOfCrossedCountingLine() == 2) //cross two lines
+				{
+					for (int i = 0; i < blobIsCounted.size(); i++)
+					{
+						if (blobIsCounted[i] == true && i != index)
+						{
+							total[i / 2][((index - i + 8) % 8) / 2] ++;
+						}
+					}
+				}
 				flag = true;
 			}
 		}
@@ -230,14 +280,15 @@ void drawBlob(vector<Blob> &blobs, Mat &frame2Copy)
 		r.width = (int)(r.width * resizeWidthCoefficient);
 		r.y = (int)(r.y * resizeHeightCoefficient);
 		r.height = (int)(r.height * resizeHeightCoefficient);
-		rectangle(frame2Copy, r, blob.getBoxColor(), lineThickness);
+		//rectangle(frame2Copy, r, blob.getBoxColor(), lineThickness);
+		rectangle(frame2Copy, r, RED, lineThickness);
 	}
 	return;
 }
 
-void drawCnt(vector<int> &cnt, Mat &frame2Copy)
+void drawCnt(vector<int> &cnt, Mat &frame2Copy, vector<Scalar> &crossingLineColor)
 {
-	double fontScale = (frame2Copy.rows * frame2Copy.cols) / 800000.0;
+	double fontScale = (frame2Copy.rows * frame2Copy.cols) / 1600000.0;
 	int fontThickness = (int)round(fontScale * 1.5);
 	for (int i = 0; i < cnt.size(); i++)
 	{
@@ -246,7 +297,7 @@ void drawCnt(vector<int> &cnt, Mat &frame2Copy)
 		Point position;
 		position.x = frame2Copy.cols - 1 - (int)((double)textSize.width * 1.1);
 		position.y = (int)((double)textSize.height * 1.25 * (i + 1));
-		putText(frame2Copy, text, position, CV_FONT_HERSHEY_SIMPLEX, fontScale, GREEN, fontThickness);
+		putText(frame2Copy, text, position, CV_FONT_HERSHEY_SIMPLEX, fontScale, crossingLineColor[i], fontThickness);
 	}
 	return;
 }

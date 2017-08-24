@@ -19,22 +19,23 @@ const Scalar GREEN = Scalar(  0, 255,   0);
 const Scalar RED   = Scalar(  0,   0, 255);
 const int lineThickness = 3;
 const int minBlobArea = 100;
-const int maxBlobArea = 100000;
-const int minBlobWidth = 20;
-const int maxBlobWidth = 500;
-const int minBlobheight = 20;
-const int maxBlobheight = 500;
-const int minBlobDiagonal = 60;
-const int maxBlobDiagonal = 1000;
+const int maxBlobArea = 10000;
+const int minBlobWidth = 10;
+const int maxBlobWidth = 150;
+const int minBlobheight = 10;
+const int maxBlobheight = 150;
+const int minBlobDiagonal = 10;
+const int maxBlobDiagonal = 150;
+const int maxBlobNum = 500;                      //skip noisy frame
 const double minBlobRatio = 0.2;
 const double maxBlobRatio = 4;
-const double leftBoundingCoefficient = 0.1;
+const double leftBoundingCoefficient = 0;
 const double rightBoundingCoefficient = 1;
-const double upBoundingCoefficient = 0.6;
+const double upBoundingCoefficient = 0;
 const double bottomBoundingCoefficient = 1;
 const double IOUThreshold = 0.7;
-const double resizeHeightCoefficient = 2;
-const double resizeWidthCoefficient = 2;
+const double resizeHeightCoefficient = 1;
+const double resizeWidthCoefficient = 1;
 
 class Blob 
 {
@@ -46,6 +47,7 @@ private:
 	double ratio;                                //width / height
 	bool isCurrentBlob;                          //is current blob£¿
 	vector<bool> isCounted;                      //is counted by lines?
+	int numOfCrossedCountingLine;                //num of crossed counting line
 	Point nextCenter;                            //next center
 	Scalar boxColor;                             //boundingbox color
 	int notMatchedFrameCnt;                      //how long it has't been matched	
@@ -62,7 +64,9 @@ public:
 	Rect getBoundingBox();                       //get boundingbox
 	Point getNextCenter();                       //get next center
 	Scalar getBoxColor();                        //get box color
+	int getNumOfCrossedCountingLine();           //get num of crossed counting line
 
+	void addNumOfCrossedCountingLine(int add);   //add num of crossed counting line
 	void changeIsCountedToTrue(int index);       //is counted to true
 	void changeIsCurrentBlobToFalse();           //is current blob to false
 	void addNotMatchedFrameCnt();                //add not matched frame cnt
@@ -74,9 +78,9 @@ public:
 void matchBlobs(vector<Blob> &existingBlobs, vector<Blob> &currentBlobs, Mat &frame2Copy);                //match existing blob and current blob
 void showContours(Size size, vector<vector<Point> > contours, string windowName);                         //show contours in point vector
 void showContours(Size size, vector<Blob> blobs, string windowName);                                      //show contours in blobs
-bool isCrossLine(vector<Blob> &blobs, Point start, Point end, int &cnt, int &index);                      //judge if the blob has crossed the counting line
+bool isCrossLine(vector<Blob> &blobs, Point start, Point end, int &cnt, int &index, vector<vector<int>> &total);       //judge if the blob has crossed the counting line
 void drawBlob(vector<Blob> &blobs, Mat &frame2Copy);                                                      //draw bounding box
-void drawCnt(vector<int> &cnt, Mat &frame2Copy);                                                          //draw counting result
+void drawCnt(vector<int> &cnt, Mat &frame2Copy, vector<Scalar> &crossingLineColor);                                                          //draw counting result
 bool isOverlapped(Rect box1, Rect box2);                                                                  //judge if bounding box is overlapped
 
 #endif 
