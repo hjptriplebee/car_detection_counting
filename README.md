@@ -1,8 +1,6 @@
 # car_detection_counting
-An algorithm for car detection and counting, which is based on frame difference.
-![img](https://raw.githubusercontent.com/hjptriplebee/car_detection_counting/master/demo.gif)
-
-
+An algorithm for car detection and counting, which is based on frame difference. Demo video can be found [here](https://www.youtube.com/watch?v=TaqK1ez3Pw8)
+![here](https://raw.githubusercontent.com/hjptriplebee/car_detection_counting/master/demo.gif)
 # Requirement
 - C++
 - OpenCV3.0
