@@ -32,22 +32,24 @@ Adjust parameters to handle videos with different view, resolution.
 The parameters can be set in "Blob.h".
 
 ```cpp
-const int minBlobArea = 100;
-const int maxBlobArea = 10000;
-const int minBlobWidth = 10;
-const int maxBlobWidth = 150;
-const int minBlobheight = 10;
-const int maxBlobheight = 150;
-const int minBlobDiagonal = 10;
-const int maxBlobDiagonal = 150;
-const int maxBlobNum = 500;                      //skip noisy frame
-const double minBlobRatio = 0.2;
-const double maxBlobRatio = 4;
-const double leftBoundingCoefficient = 0;
+const int minBlobArea = 100;                     // min area of an object
+const int maxBlobArea = 10000;                   // max area of an object
+const int minBlobWidth = 10;                     // min width
+const int maxBlobWidth = 150;                    // max width
+const int minBlobheight = 10;                    // min height
+const int maxBlobheight = 150;                   // max height
+const int minBlobDiagonal = 10;                  // min diagonal
+const int maxBlobDiagonal = 150;                 // max diagonal
+const int maxBlobNum = 500;        // max number of objects in a frame, if a frame contains too many objeects, it may be a noisy frame
+const double minBlobRatio = 0.2;                 // min ratio of width and height
+const double maxBlobRatio = 4;                   // max ratio of width and height
+// bounding coefficient is used to get ROI. Objects which are not in ROI will not be detected. For example, if leftBoundingCoefficient = 0.1 and the width of a frame is 1080, then the left bounding of ROI start from 1080 * 0.1 = 108. Default value means ROI is the whole frame.
+const double leftBoundingCoefficient = 0;      
 const double rightBoundingCoefficient = 1;
 const double upBoundingCoefficient = 0;
 const double bottomBoundingCoefficient = 1;
-const double IOUThreshold = 0.7;
-const double resizeHeightCoefficient = 1;
+const double IOUThreshold = 0.7; 
+// resize coefficient is used to resize frame. If resize width coefficient = 0.5 and the width of a frame is 1080, then the width of the frame will be resized to 1080 * 0.5 = 540. Resize to a smaller frame can avoid some noise and increase the speed of our algorithm. Default value means no resize.
+const double resizeHeightCoefficient = 1;  
 const double resizeWidthCoefficient = 1;
 ```
